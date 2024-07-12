@@ -1,0 +1,65 @@
+x-project:
+  name: ita-soccer-league
+  
+services:
+  postgres:
+    image: postgres:14-alpine
+    networks: 
+      - mynetwork
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - ~/apps/postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /data/postgres
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always  
+
+  backend:
+    build: 
+      context: ./ITA-Backend-main
+      dockerfile: Dockerfile
+    container_name: backend
+    ports:
+      - "8080:8080"
+    networks: 
+      - mynetwork
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v1/match/upcoming"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/compass-soccer-league
+    restart: always    
+
+  frontend:
+    build: 
+      context: ./ITA-Frontend-main
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:80"
+    networks: 
+      - mynetwork  
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: always  
+
+networks:
+  mynetwork:
+    driver: bridge
+  
